@@ -81,7 +81,9 @@ void Protein::Setup(std::string inputfile){
 double Protein::ComputeDistance(Atom a1, Atom a2){
     double sum, ans;
     sum = pow((a1.x-a2.x),2) + pow((a1.y-a2.y),2) + pow((a1.z-a2.z),2);
+    // change to times
     ans = sqrt(sum)/10.; // Divide by 10 to get Angstroms
+    // leave as squared, change to Angs. later
     return ans;
 }
 

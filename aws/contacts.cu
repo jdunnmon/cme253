@@ -101,8 +101,10 @@ void Protein::Setup(std::string inputfile){
 double Protein::ComputeDistance(Atom a1, Atom a2){
     double sum, ans;
     sum = pow((a1.x-a2.x),2) + pow((a1.y-a2.y),2) + pow((a1.z-a2.z),2);
+    // change to times
     ans = sqrt(sum)/10.; // Divide by 10 to get Angstroms
     return ans;
+    // leave as squared, change to Angs. later
 }
 
 std::vector<double> Protein::ContactFeaturizer(){
@@ -117,6 +119,31 @@ std::vector<double> Protein::ContactFeaturizer(){
     return distances;
 
 }
+
+    /*
+    CU:
+    divide upper triangle of distance^2 matrix into blocks 1/4
+    the size of the next largest one
+    tile: the computing unit should be a square
+    first, compute the full square
+    then, compare to a bunch of files
+
+    dynamic size based on length of chain and GPU sharedmem size?
+    max, 10k residues - might not be big enough to notice a difference
+    in GPU implementation
+    plan on sending full traj to GPU from the outset 
+    send full trajectory to GPU
+
+    memory / compute ratio ~ 1 / 10
+    compute to memory access ratio
+    do something that is fx of distance for more computations
+    quadroupole moments
+
+    heavy atom contact featurizers
+
+    eventually on the GPU everything will be linearized
+    */
+
 
 /*__global__ std::vector<double> Protein::ContactFeaturizerCuda(int * ){
     std::vector<double> distances;
