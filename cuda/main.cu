@@ -4,6 +4,7 @@
 #include <math.h>
 #include <string>
 #include <vector>
+#include "./debug.h"
 
 //cuda error checking macros
 #ifdef DEBUG
@@ -171,38 +172,22 @@ std::vector<double> LPContactFeaturizer(std::vector<int>& prot_atomnums,
 
 
 __global__ void cuContacts(double *pxyz, double *lxyz, double *cudists){
-  int atomdist = threadIdx.x + blockIdx.x * blockDim.x;
-  int p_size = sizeof(pxyz)/sizeof(pxyz[0]);
-  cudists[atomdist] = 
-
-
-  cudists[atomdist] = 
+  //printf("meep\n");
+  int cudists_idx = threadIdx.x + blockIdx.x * blockDim.x;
+  
+  if(cudists_idx < 51){
+  printf("protein - %f \n", pxyz[cudists_idx]);
+  printf("ligand - %f \n", lxyz[cudists_idx]);
+  printf("distance - %f \n", cudists[cudists_idx]);
+  }
+  //int p_size = sizeof(pxyz)/sizeof(pxyz[0]);
+  //printf(cudists_idx+"\n");
+  //cudists[cudists_idx] = { floor(double(cudists_idx) / double( sizeof(pxyz)/sizeof(pxyz[0])) )
+  //                               * ( sizeof(pxyz)/sizeof(pxyz[0]) )
+  //                               + (cudists_idx - floor(double(cudists_idx) / double(sizeof(pxyz)/sizeof(pxyz[0])))) };  
+  cudists[cudists_idx] = 20.;
 }
 
-/*
-__global__ std::vector<double> CudaLPContactFeaturizer(std::vector<int>& prot_atomnums,
-                                        std::vector<std::vector<double>>& prot_xyz_coords,
-                                        std::vector<int>& lig_trajnums,
-                                        std::vector<std::vector<double>>& lig_xyz_coords){
-
-    std::vector<double> all_distances;
-
-    int n_frames = (lig_trajnums[lig_trajnums.size() - 1]) + 1;
-    std::cout << "Number of frames in trajectory : " << n_frames << std::endl;
-
-
-    // call a kernel on each frame (18 x 4500 distances)
-    // optimize concurrency to accomplish this
-
-    // transfer chunks of protein and entire trajectory
-    // put protein in shared memory
-
-    // shared memory optimization - optimize memory access patterns
-    // so that we don't have bank conflicts that slow us down
-
-    return all_distances;
-}
-*/
 
 int main(int argc, char *argv[])
 {
@@ -261,6 +246,7 @@ int main(int argc, char *argv[])
 
   /* start the CUDA stuff */
   double *pxyz, *lxyz, *cudists;
+  double *d_pxyz, *d_lxyz, *d_cudists;
 
   int protein_size = prot_atomnums.size()*3;
   int ligand_traj_size = lig_trajnums.size()*3;
@@ -268,21 +254,23 @@ int main(int argc, char *argv[])
   pxyz = (double *)malloc( protein_size * sizeof(double));
   lxyz = (double *)malloc( ligand_traj_size * sizeof(double));
   cudists = (double *)malloc( protein_size * ligand_traj_size * sizeof(double));
+  std::cout << "malloced size : " << protein_size * ligand_traj_size * sizeof(double) << std::endl;
+  std::cout << "Number of unfilled cudists : " << sizeof cudists << std::endl;
 
   for(unsigned int pp = 0; pp < prot_atomnums.size(); pp++){
     pxyz[pp*3] = prot_xyz_coords[pp][0];
     pxyz[pp*3+1] = prot_xyz_coords[pp][1];
     pxyz[pp*3+2] = prot_xyz_coords[pp][2];
-    std::cout << "Last index of pxyz was " << pp*3+2 << std::endl;
+    //std::cout << "Last index of pxyz was " << pp*3+2 << std::endl;
   }
 
-  for(unsigned int ll = 0; ll < ligand_trajnums.size(); ll++){
+  for(unsigned int ll = 0; ll < lig_trajnums.size(); ll++){
     lxyz[ll*3] = lig_xyz_coords[ll][0];
     lxyz[ll*3+1] = lig_xyz_coords[ll][1];
     lxyz[ll*3+2] = lig_xyz_coords[ll][2];
-    std::cout << "Last index of lxyz was " << ll*3+2 << std::endl;
+    //std::cout << "Last index of lxyz was " << ll*3+2 << std::endl;
   }
-
+ 
   /* Get GPU device number and name */
   int dev;
   cudaDeviceProp deviceProp;
@@ -292,27 +280,33 @@ int main(int argc, char *argv[])
 
   /* allocate space on device */
   checkCUDA( cudaMalloc( (void **) &d_pxyz, protein_size*sizeof(double)) );
-  checkCUDA( cudaMalloc( (void **) &d_lxyz, ligand_size*sizeof(double)) );
-  checkCUDA( cudaMalloc( (void **) &d_cudists, protein_size*ligand_size*sizeof(double)) );
+  printf("Protein memory allocated\n");
+  checkCUDA( cudaMalloc( (void **) &d_lxyz, ligand_traj_size*sizeof(double)) );
+  printf("Ligand memory allocated\n");
+  checkCUDA( cudaMalloc( (void **) &d_cudists, protein_size*ligand_traj_size*sizeof(double)) );
+    printf("All memory allocated\n"); 
 
   /* copy inputs to device */
-  checkCUDA( cudaMemcpy( d_pyxz, pxyz,
+  checkCUDA( cudaMemcpy( d_pxyz, pxyz,
                          protein_size*sizeof(double),
                          cudaMemcpyHostToDevice ) );
   checkCUDA( cudaMemcpy( d_lxyz, lxyz,
-                         ligand_size*sizeof(double),
+                         ligand_traj_size*sizeof(double),
                          cudaMemcpyHostToDevice ) );
-  checkCUDA( cudaMemset( d_cudists, 0,
-                         protein_size*ligand_size*sizeof(double)) );
+  checkCUDA( cudaMemset( d_cudists, 5.,
+                         protein_size*ligand_traj_size*sizeof(double)) );
+   printf("Inputs copied\n");
 
   /* launch kernel */
-  {cuContacts<<< ceil(protein_size*ligand_size / THREADS_PER_BLOCK),
-                     THREADS_PER_BLOCK >>> (d_pxyz, d_lxyz, d_cudists)}
+  cuContacts<<< ceil(protein_size*ligand_traj_size / THREADS_PER_BLOCK),
+                     THREADS_PER_BLOCK >>> (d_pxyz, d_lxyz, d_cudists);
+  checkKERNEL();
   // have teams of 4 threads: x, y, z, reduction
 
   /* copy result back to host */
   checkCUDA( cudaMemcpy( cudists, d_cudists,
-                         protein_size*ligand_size*sizeof(double)) );
+                         protein_size*ligand_traj_size*sizeof(double),
+                         cudaMemcpyDeviceToHost ) );
 
   // could put in a checking condition here with the cpp distances
 
@@ -327,34 +321,9 @@ int main(int argc, char *argv[])
 
   checkCUDA( cudaDeviceReset () ); 
 
-/*
-  std::vector<double> distances = LPContactFeaturizer(prot_atomnums,
-                                                      prot_xyz_coords,
-                                                      lig_trajnums,
-                                                      lig_xyz_coords);
+  std::cout << "Number of cuda distances computed : " << sizeof cudists << std::endl; 
+  std::cout << "First cuda distance computed : " << cudists[0] << std::endl;
 
-//  double *pxyz;
-//  double *lxyz;
-
-  std::vector<double> cudaDistances = CudaLPContactFeaturizer(prot_atomnums,
-                                                              prot_xyz_coords,
-                                                              lig_trajnums,
-                                                              lig_xyz_coords);
-*/
-  // for(unsigned int k = 0; k < distances.size(); k++){
-  //                       std::cout << distances[k] << std::endl;
-  //                   }
-/*
-  std::cout << "Number of cpp distances computed : " << distances.size() << std::endl; 
-
-  std::ofstream f("cpp_distances.txt");
-  if(f.is_open()){
-    for(unsigned int k = 0; k < distances.size(); k++){
-                        f << distances[k] << std::endl;
-                    }
-  }
-  f.close();
-*/
   return 0;
 
 }
