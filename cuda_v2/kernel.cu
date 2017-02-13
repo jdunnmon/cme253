@@ -206,9 +206,10 @@ int main(int argc, char *argv[])
   /* print out cpp distances to a file */
   std::cout << "Number of cpp distances computed : " << distances.size() << std::endl;
   std::cout << "First cpp distance computed : " << distances[0] << std::endl;
-  std::cout << "50th cpp distance computed : " << distances[50] << std::endl;
-  if(prot_atomnums.size() > 4000){
-  std::cout << "100kth cpp distance computed : " << distances[100000] << std::endl; }
+  if(prot_atomnums.size()*lig_trajnums.size() > 50){
+    std::cout << "50th cpp distance computed : " << distances[50] << std::endl; }
+  if(prot_atomnums.size()*lig_trajnums.size() > 100000){
+    std::cout << "100kth cpp distance computed : " << distances[100000] << std::endl; }
   /*
   std::ofstream f("cpp_distances.txt");
   if(f.is_open()){
@@ -281,9 +282,10 @@ int main(int argc, char *argv[])
 
   //std::cout << "Number of cuda distances computed : " << sizeof cudists << std::endl; 
   std::cout << "First cuda distance computed : " << cudists[0] << std::endl;
-  std::cout << "50th cuda distance computed : " << cudists[50] << std::endl;
-  if(prot_atomnums.size() > 4000){
-  std::cout << "100kth cuda distance computed : " << cudists[100000] << std::endl; }
+  if(prot_atomnums.size()*lig_trajnums.size() > 50){
+    std::cout << "50th cuda distance computed : " << cudists[50] << std::endl; }
+  if(prot_atomnums.size()*lig_trajnums.size() > 100000){
+   std::cout << "100kth cuda distance computed : " << cudists[100000] << std::endl; }
 
 
   std::ofstream f("distances.txt");
