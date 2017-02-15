@@ -301,10 +301,47 @@ int main(int argc, char *argv[])
   checkCUDA( cudaMemset( d_cudists, 0, cudists_size*sizeof(double) ) );
 
 /* setup threadblock size and grid sizes*/
+  printf("Setting up threads and blocks \n");
 
-  dim3 threads(plength[0], llength[0], 1);
-  dim3 blocks(cudists_size/plength[0]+1,
-              cudists_size/llength[0]+1, 1);
+  int pfix = ceil(plength[0]/1024.);
+  int lfix = ceil(llength[0]/1024.);
+
+  std::cout << "Made fixes: " << pfix << " " << lfix << std::endl;
+
+
+  //dim3 threads(plength[0]/pfix+1, llength[0]/lfix+1,1);
+  dim3 threads(32, 32, 1);
+  dim3 blocks(cudists_size/threads.x+1,
+              cudists_size/threads.y+1,
+              1 );
+
+//  dim3 threads(plength[0], llength[0], 1);
+//  dim3 blocks(cudists_size/plength[0]+1,
+//              cudists_size/llength[0]+1, 1);
+
+    cudaDeviceProp prop;
+
+    cudaGetDeviceProperties(&prop, 0);
+    if (threads.x * threads.y * threads.z > prop.maxThreadsPerBlock) {
+        printf("Too many threads per block \n");
+        //printf("(%d) \n" % prop.maxThreadsPerBlock);
+        //goto cleanup;
+    }
+    if (threads.x > prop.maxThreadsDim[0]) {
+        printf("Too many threads in x-direction \n");
+        //printf("(%d) \n" % prop.maxThreadsDim[0]);
+        //goto cleanup;
+    }
+    if (threads.y > prop.maxThreadsDim[1]) {
+        printf("Too many threads in y-direction \n");
+        //printf("(%d) \n" % prop.maxThreadsDim[1]);
+        //goto cleanup;
+    }
+    if (threads.z > prop.maxThreadsDim[2]) {
+        printf("Too many threads in z-direction \n");
+        //goto cleanup;
+    }
+   printf("Ready to launch kernel\n");
 
 /* launch the kernel on the GPU */
   cuContacts<<< blocks, threads >>>( d_pxyz, d_lxyz, d_cudists, d_plength, d_llength );
