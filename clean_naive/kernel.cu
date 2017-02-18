@@ -262,8 +262,8 @@ int main(int argc, char *argv[])
 
 /* setup threadblock size and grid sizes*/
   dim3 threads(THREADS_PER_BLOCK_X, THREADS_PER_BLOCK_X, 1);
-  dim3 blocks(cudists_size/threads.x+1,
-              cudists_size/threads.y+1,
+  dim3 blocks(plength[0]/threads.x+1,
+              llength[0]/threads.y+1,
               1 );
 
     cudaDeviceProp prop;
