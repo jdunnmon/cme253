@@ -25,6 +25,10 @@
 #endif
 
 #define MY_LIGAND_SIZE 51
+#define MY_PROTEIN_SIZE 4573
+#define THREADS_PER_BLOCK_X  32
+#define THREADS_PER_BLOCK_Y  32
+
 typedef std::chrono::high_resolution_clock Clock;
 
 void ProteinSetup(std::string protein_inputfile,
@@ -154,28 +158,31 @@ __global__ void cuContactsSMEM(double *pxyz, double *lxyz, double *cudists, int 
   int pidx = threadIdx.x + blockIdx.x * blockDim.x;
   int lidx = threadIdx.y + blockIdx.y * blockDim.y;
   
-  __shared__ double temp[MY_LIGAND_SIZE*3];
-  if(lidx<llength[0]){
+
+  //int tileX = blockDim.x*blockIdx.x;
+  //int tileY = blockDim.y*blockIdx.y;
+
+  __shared__ double temp[THREADS_PER_BLOCK_X][THREADS_PER_BLOCK_Y+1];
+/*  if(lidx<llength[0]){
       temp[3*lidx] = lxyz[3*lidx];
       temp[3*lidx+1] = lxyz[3*lidx+1];
       temp[3*lidx+2] = lxyz[3*lidx+2];
-}
-  __syncthreads();
+}*/
 
   if ( (pidx < plength[0]) && (lidx< llength[0])){
-    cudists[pidx+plength[0]*lidx] = ( sqrt(
-               (pxyz[pidx*3]-temp[lidx*3])*(pxyz[pidx*3]-temp[lidx*3])
-             + (pxyz[pidx*3+1]-temp[lidx*3+1])*(pxyz[pidx*3+1]-temp[lidx*3+1])
-             + (pxyz[pidx*3+2]-temp[lidx*3+2])*(pxyz[pidx*3+2]-temp[lidx*3+2])  )/10. );
+    temp[threadIdx.x][threadIdx.y] = ( sqrt(
+               (pxyz[pidx*3]-lxyz[lidx*3])*(pxyz[pidx*3]-lxyz[lidx*3])
+             + (pxyz[pidx*3+1]-lxyz[lidx*3+1])*(pxyz[pidx*3+1]-lxyz[lidx*3+1])
+             + (pxyz[pidx*3+2]-lxyz[lidx*3+2])*(pxyz[pidx*3+2]-lxyz[lidx*3+2])  )/10. );
 
   }  
   __syncthreads();
 
+  if ( (pidx < plength[0]) && (lidx< llength[0])){
+    cudists[pidx+plength[0]*lidx] = temp[threadIdx.x][threadIdx.y];
 }
 
-
-#define THREADS_PER_BLOCK_X 32
-#define THREADS_PER_BLOCK_Y 32
+}
 
 int main(int argc, char *argv[])
 {
@@ -288,9 +295,9 @@ int main(int argc, char *argv[])
   checkCUDA( cudaMemset( d_cudists, 0, cudists_size*sizeof(double) ) );
 
 /* setup threadblock size and grid sizes*/
-  dim3 threads(THREADS_PER_BLOCK_X, THREADS_PER_BLOCK_X, 1);
-  dim3 blocks(cudists_size/threads.x+1,
-              cudists_size/threads.y+1,
+  dim3 threads(THREADS_PER_BLOCK_X, THREADS_PER_BLOCK_Y, 1);
+  dim3 blocks(plength[0]/threads.x+1,
+              llength[0]/threads.y+1,
               1 );
 
     cudaDeviceProp prop;
